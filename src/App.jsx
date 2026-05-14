@@ -41,7 +41,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-const API = "http://localhost:3001";
+const API = "https://hiresetu-u4ot.onrender.com";
 
 const categories = [
   { title: "Pharma", icon: Pill, jobs: "1,240", desc: "Production, QA, R&D, Medical Rep", gradient: "from-blue-500 to-cyan-400" },
