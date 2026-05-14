@@ -198,7 +198,7 @@ function JobsPage({ jobs, selectedCategory, setSelectedCategory, role, setRole, 
   const [query, setQuery] = useState("");
   const approvedJobs = jobs.filter((j) => j.status === "Approved");
   const filtered = approvedJobs.filter((job) => (!selectedCategory || job.category === selectedCategory) && `${job.title} ${job.company} ${job.location}`.toLowerCase().includes(query.toLowerCase()));
-  return <section className="bg-slate-50 px-4 py-10 sm:px-5"><div className="mx-auto max-w-7xl"><div className="rounded-[2rem] bg-gradient-to-br from-slate-950 to-blue-950 p-6 text-white shadow-2xl shadow-slate-950/20 sm:p-8"><p className="text-sm font-black uppercase tracking-[0.2em] text-blue-200">Job Search</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Find the right job faster.</h2><p className="mt-3 text-slate-300">Search by category, company or location.</p></div><div className="mt-6 grid gap-4 lg:grid-cols-[280px_1fr]"><aside className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><div className="mb-4 flex items-center gap-2 font-black text-slate-950"><Filter size={18} /> Categories</div><button onClick={() => setSelectedCategory("")} className={`mb-2 w-full rounded-2xl px-4 py-3 text-left text-sm font-black ${!selectedCategory ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-700"}`}>All Categories</button>{categories.map((cat) => <button key={cat.title} onClick={() => setSelectedCategory(cat.title)} className={`mb-2 w-full rounded-2xl px-4 py-3 text-left text-sm font-black ${selectedCategory === cat.title ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-700 hover:bg-blue-50"}`}>{cat.title}</button>)}</aside><main><div className="mb-5 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3"><Search size={19} className="text-slate-400" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search jobs, company, location..." className="w-full bg-transparent text-sm font-bold outline-none" /></div></div><div className="grid gap-5 lg:grid-cols-2">{filtered.map((job) => <JobCard key={job.id} job={job} role={role} setRole={setRole} setPage={setPage} applyToJob={applyToJob} />)}</div>{filtered.length === 0 && <div className="rounded-3xl bg-white p-8 text-center font-black text-slate-500 ring-1 ring-slate-200">No jobs found in this category.</div>}</main></div></div></section>;
+  return <section className="bg-slate-50 px-4 py-10 sm:px-5"><div className="mx-auto max-w-7xl"><div className="rounded-[2rem] bg-gradient-to-br from-slate-950 to-blue-950 p-6 text-white shadow-2xl shadow-slate-950/20 sm:p-8"><p className="text-sm font-black uppercase tracking-[0.2em] text-blue-200">Job Search</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Find the right job faster.</h2><p className="mt-3 text-slate-300">Search by category, company or location.</p></div><div className="mt-6 grid gap-4 lg:grid-cols-[280px_1fr]"><aside className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><div className="mb-4 flex items-center gap-2 font-black text-slate-950"><Filter size={18} /> Categories</div><button onClick={() => setSelectedCategory("")} className={`mb-2 w-full rounded-2xl px-4 py-3 text-left text-sm font-black ${!selectedCategory ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-700"}`}>All Categories</button>{categories.map((cat) => <button key={cat.title} onClick={() => setSelectedCategory(cat.title)} className={`mb-2 w-full rounded-2xl px-4 py-3 text-left text-sm font-black ${selectedCategory === cat.title ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-700 hover:bg-blue-50"}`}>{cat.title}</button>)}</aside><main><div className="mb-5 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3"><Search size={19} className="text-slate-400" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search jobs, company, location..." className="w-full bg-transparent text-sm font-bold outline-none" /></div></div><div className="grid gap-5 lg:grid-cols-2">{filtered.map((job) => <JobCard key={job._id || job.id} job={job} role={role} setRole={setRole} setPage={setPage} applyToJob={applyToJob} />)}</div>{filtered.length === 0 && <div className="rounded-3xl bg-white p-8 text-center font-black text-slate-500 ring-1 ring-slate-200">No jobs found in this category.</div>}</main></div></div></section>;
 }
 
 function JobsSection({ setPage }) {
@@ -270,7 +270,13 @@ function EmployerDashboard({ jobs, setJobs, showToast }) {
         return;
       }
 
-      setJobs((prev) => [data.job, ...prev]);
+      setJobs((prev) =>
+  prev.map((j) =>
+    (j._id || j.id) === id
+      ? { ...j, status }
+      : j
+  )
+);
       setForm({
         title: "",
         company: "",
@@ -297,11 +303,22 @@ function Input({ placeholder, value, onChange }) {
 function AdminDashboard({ jobs, setJobs, showToast }) {
   const pending = jobs.filter((j) => j.status === "Pending");
 
+  async function reloadJobs() {
+    const res = await fetch(`${API}/api/admin/jobs`);
+    const data = await res.json();
+
+    if (data.ok) {
+      setJobs(data.jobs);
+    }
+  }
+
   async function setStatus(id, status) {
     try {
       const res = await fetch(`${API}/api/admin/jobs/${id}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ status }),
       });
 
@@ -312,7 +329,8 @@ function AdminDashboard({ jobs, setJobs, showToast }) {
         return;
       }
 
-      setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, status } : j)));
+      await reloadJobs();
+
       showToast(`Job ${status}`, "success");
     } catch (err) {
       console.error(err);
@@ -320,7 +338,98 @@ function AdminDashboard({ jobs, setJobs, showToast }) {
     }
   }
 
-  return <DashboardShell title="Admin Dashboard" subtitle="Full control over candidates, employers, jobs and approvals" badge="Admin"><div className="grid gap-5 md:grid-cols-4"><StatCard icon={Users} value="4.8K" label="Candidates" /><StatCard icon={Building2} value="850" label="Employers" color="bg-emerald-600" /><StatCard icon={Briefcase} value={jobs.length} label="Total Jobs" color="bg-orange-500" /><StatCard icon={ShieldCheck} value={pending.length} label="Pending Jobs" color="bg-violet-600" /></div><div className="mt-6 grid gap-6 lg:grid-cols-2"><div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><h3 className="text-xl font-black text-slate-950">Pending Job Approvals</h3><div className="mt-5 space-y-3">{pending.length === 0 && <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No pending jobs right now.</p>}{pending.map((job) => <div key={job.id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4"><div><p className="font-black text-slate-950">{job.title}</p><p className="text-sm font-bold text-slate-500">{job.company} • {job.category}</p></div><div className="flex gap-2"><button onClick={() => setStatus(job.id, "Approved")} className="rounded-xl bg-emerald-50 p-2 text-emerald-700 hover:bg-emerald-100"><Check size={18} /></button><button onClick={() => setStatus(job.id, "Rejected")} className="rounded-xl bg-red-50 p-2 text-red-700 hover:bg-red-100"><X size={18} /></button></div></div>)}</div></div><div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><h3 className="text-xl font-black text-slate-950">Admin Controls</h3><div className="mt-5 grid gap-3">{[{ icon: ClipboardList, text: "Approve Job Posts" }, { icon: UserCog, text: "Manage User Roles" }, { icon: BarChart3, text: "View Platform Analytics" }, { icon: FileText, text: "Track Hiring Status" }].map((item) => { const Icon = item.icon; return <div key={item.text} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4"><div className="flex items-center gap-3"><Icon className="text-blue-600" size={20} /><p className="font-black text-slate-800">{item.text}</p></div><ChevronRight className="text-slate-400" /></div>; })}</div></div></div></DashboardShell>;
+  return (
+    <DashboardShell
+      title="Admin Dashboard"
+      subtitle="Full control over candidates, employers, jobs and approvals"
+      badge="Admin"
+    >
+      <div className="grid gap-5 md:grid-cols-4">
+        <StatCard icon={Users} value="4.8K" label="Candidates" />
+        <StatCard icon={Building2} value="850" label="Employers" color="bg-emerald-600" />
+        <StatCard icon={Briefcase} value={jobs.length} label="Total Jobs" color="bg-orange-500" />
+        <StatCard icon={ShieldCheck} value={pending.length} label="Pending Jobs" color="bg-violet-600" />
+      </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <h3 className="text-xl font-black text-slate-950">
+            Pending Job Approvals
+          </h3>
+
+          <div className="mt-5 space-y-3">
+            {pending.length === 0 && (
+              <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                No pending jobs right now.
+              </p>
+            )}
+
+            {pending.map((job) => {
+              const jobId = job._id || job.id;
+
+              return (
+                <div
+                  key={jobId}
+                  className="flex items-center justify-between rounded-2xl bg-slate-50 p-4"
+                >
+                  <div>
+                    <p className="font-black text-slate-950">{job.title}</p>
+                    <p className="text-sm font-bold text-slate-500">
+                      {job.company} • {job.category}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setStatus(jobId, "Approved")}
+                      className="rounded-xl bg-emerald-50 p-2 text-emerald-700 hover:bg-emerald-100"
+                    >
+                      <Check size={18} />
+                    </button>
+
+                    <button
+                      onClick={() => setStatus(jobId, "Rejected")}
+                      className="rounded-xl bg-red-50 p-2 text-red-700 hover:bg-red-100"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <h3 className="text-xl font-black text-slate-950">Admin Controls</h3>
+
+          <div className="mt-5 grid gap-3">
+            {[
+              { icon: ClipboardList, text: "Approve Job Posts" },
+              { icon: UserCog, text: "Manage User Roles" },
+              { icon: BarChart3, text: "View Platform Analytics" },
+              { icon: FileText, text: "Track Hiring Status" },
+            ].map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <div
+                  key={item.text}
+                  className="flex items-center justify-between rounded-2xl bg-slate-50 p-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="text-blue-600" size={20} />
+                    <p className="font-black text-slate-800">{item.text}</p>
+                  </div>
+                  <ChevronRight className="text-slate-400" />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </DashboardShell>
+  );
 }
 
 function DashboardShell({ title, subtitle, badge, children }) {
