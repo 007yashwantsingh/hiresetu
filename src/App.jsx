@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { LoginPage, RegisterPage } from "./AuthPages";
 import {
   Briefcase, Building2, Users, ShieldCheck, ArrowRight, Search,
   Stethoscope, Landmark, Headphones, TrendingUp, Pill, Code2,
@@ -169,6 +168,256 @@ function Navbar({ setPage, role, setRole }) {
         </div>
       )}
     </>
+  );
+}
+
+// ─── Login Page ───────────────────────────────────────────────────
+function LoginPage({ setRole, setPage, showToast }) {
+  const [selRole, setSelRole] = useState("candidate");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
+
+  async function handleLogin() {
+    if (!email || !password) { setError("Email aur password required hai"); return; }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, role: selRole }),
+      });
+      const data = await res.json();
+      if (!data.ok) { setError(data.message || "Invalid credentials"); setLoading(false); return; }
+      localStorage.setItem("hs_user", JSON.stringify({ name: data.user?.name, email, role: data.user?.role || selRole, token: data.token }));
+      setRole(data.user?.role || selRole);
+      showToast?.("Welcome back!", "success");
+      const r = data.user?.role || selRole;
+      setPage(r === "admin" ? "admin" : r === "employer" ? "employer" : "candidate");
+    } catch {
+      setError("Backend offline — use Demo Login");
+      setShowDemo(true);
+    }
+    setLoading(false);
+  }
+
+  function demoLogin(r) {
+    setRole(r);
+    showToast?.(`Logged in as ${r}`, "success");
+    setPage(r === "admin" ? "admin" : r === "employer" ? "employer" : "candidate");
+  }
+
+  return (
+    <section className="min-h-[calc(100vh-76px)] bg-slate-50 flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="rounded-[2rem] bg-white p-8 shadow-2xl shadow-slate-950/8 ring-1 ring-slate-200 animate-fade-up">
+          <div className="mb-7 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-950 to-blue-800 text-white shadow-lg">
+              <Briefcase size={26} />
+            </div>
+            <h2 className="font-display text-2xl font-black text-slate-950">Sign in to HireSetu</h2>
+            <p className="mt-1.5 text-sm font-semibold text-slate-400">
+              New here?{" "}
+              <button onClick={() => setPage("register")} className="font-bold text-blue-600 hover:underline">Create an account</button>
+            </p>
+          </div>
+
+          {/* Role Toggle */}
+          <div className="mb-5 flex gap-2 rounded-2xl bg-slate-100 p-1">
+            {["candidate", "employer"].map((r) => (
+              <button key={r} onClick={() => setSelRole(r)}
+                className={`flex-1 rounded-xl py-2.5 text-sm font-bold capitalize transition-all btn-press ${selRole === r ? "bg-white text-slate-950 shadow-md" : "text-slate-500 hover:text-slate-700"}`}>
+                {r === "candidate" ? "👤 Candidate" : "🏢 Employer"}
+              </button>
+            ))}
+          </div>
+
+          {error && (
+            <div className="mb-4 flex items-center gap-2.5 rounded-2xl bg-red-50 p-4 ring-1 ring-red-100">
+              <AlertCircle size={17} className="text-red-500 shrink-0" />
+              <p className="text-sm font-bold text-red-700">{error}</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 ring-1 ring-slate-200 focus-within:ring-blue-500 transition-all">
+              <Mail size={17} className="text-slate-400 shrink-0" />
+              <input type="email" placeholder="you@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                className="w-full bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400" />
+            </div>
+            <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 ring-1 ring-slate-200 focus-within:ring-blue-500 transition-all">
+              <LockKeyhole size={17} className="text-slate-400 shrink-0" />
+              <input type={showPass ? "text" : "password"} placeholder="Enter your password" value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                className="w-full bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400" />
+              <button onClick={() => setShowPass(!showPass)} className="text-slate-400 hover:text-slate-600 shrink-0">
+                <Eye size={17} />
+              </button>
+            </div>
+          </div>
+
+          <button onClick={handleLogin} disabled={loading}
+            className="mt-5 w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-4 font-bold text-white text-sm shadow-lg shadow-blue-600/25 transition-all disabled:opacity-60 btn-press flex items-center justify-center gap-2">
+            {loading ? <><RefreshCw size={16} className="animate-spin" /> Signing in...</> : <>Sign In <ArrowRight size={17} /></>}
+          </button>
+
+          <div className="mt-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-slate-200" /><span className="text-xs font-bold text-slate-400">or</span><div className="h-px flex-1 bg-slate-200" />
+          </div>
+
+          <button onClick={() => setShowDemo(!showDemo)}
+            className="mt-4 w-full flex items-center justify-between rounded-2xl bg-slate-50 px-5 py-3.5 text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors ring-1 ring-slate-200">
+            <span>Demo Login (Testing)</span>
+            <ChevronRight size={16} className={`transition-transform ${showDemo ? "rotate-90" : ""}`} />
+          </button>
+          {showDemo && (
+            <div className="mt-2 grid gap-2 animate-fade-up">
+              {[{ r: "candidate", label: "👤 Login as Candidate", cls: "bg-blue-50 text-blue-700 ring-blue-100" },
+                { r: "employer", label: "🏢 Login as Employer", cls: "bg-emerald-50 text-emerald-700 ring-emerald-100" },
+                { r: "admin", label: "🛡️ Login as Admin", cls: "bg-slate-950 text-white ring-slate-800" }
+              ].map((d) => (
+                <button key={d.r} onClick={() => demoLogin(d.r)}
+                  className={`rounded-2xl px-5 py-3 text-sm font-bold ring-1 transition-all btn-press ${d.cls}`}>{d.label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Register Page ────────────────────────────────────────────────
+function RegisterPage({ setRole, setPage, showToast }) {
+  const [selRole, setSelRole] = useState("candidate");
+  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirm: "" });
+  const [showPass, setShowPass] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  function upd(f, v) { setForm((p) => ({ ...p, [f]: v })); setErrors((p) => ({ ...p, [f]: "" })); }
+
+  function validate() {
+    const e = {};
+    if (!form.name.trim()) e.name = "Name required";
+    if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
+    if (!form.phone || form.phone.length < 10) e.phone = "10-digit phone required";
+    if (!form.password || form.password.length < 6) e.password = "Min 6 characters";
+    if (form.password !== form.confirm) e.confirm = "Passwords don't match";
+    return e;
+  }
+
+  async function handleRegister() {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/auth/register`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: form.name.trim(), email: form.email, phone: form.phone, password: form.password, role: selRole }),
+      });
+      const data = await res.json();
+      if (!data.ok) { setErrors({ general: data.message || "Registration failed" }); setLoading(false); return; }
+      localStorage.setItem("hs_user", JSON.stringify({ name: form.name.trim(), email: form.email, role: selRole, token: data.token }));
+      setDone(true);
+      showToast?.(`Welcome, ${form.name}!`, "success");
+      setTimeout(() => { setRole(selRole); setPage(selRole === "employer" ? "employer" : "candidate"); }, 1800);
+    } catch {
+      setDone(true);
+      showToast?.("Account created (offline mode)", "success");
+      setTimeout(() => { setRole(selRole); setPage(selRole === "employer" ? "employer" : "candidate"); }, 1800);
+    }
+    setLoading(false);
+  }
+
+  if (done) return (
+    <section className="min-h-[calc(100vh-76px)] bg-slate-50 flex items-center justify-center px-4">
+      <div className="text-center animate-fade-up">
+        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-2xl shadow-emerald-500/30">
+          <CheckCircle2 size={40} className="text-white" />
+        </div>
+        <h2 className="font-display text-3xl font-black text-slate-950">You're all set!</h2>
+        <p className="mt-3 text-base font-semibold text-slate-500">Taking you to your dashboard...</p>
+      </div>
+    </section>
+  );
+
+  return (
+    <section className="min-h-[calc(100vh-76px)] bg-slate-50 flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="rounded-[2rem] bg-white p-8 shadow-2xl shadow-slate-950/8 ring-1 ring-slate-200 animate-fade-up">
+          <div className="mb-6 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-lg">
+              <UserCheck size={26} />
+            </div>
+            <h2 className="font-display text-2xl font-black text-slate-950">Create your account</h2>
+            <p className="mt-1.5 text-sm font-semibold text-slate-400">
+              Already have one?{" "}
+              <button onClick={() => setPage("login")} className="font-bold text-blue-600 hover:underline">Sign in</button>
+            </p>
+          </div>
+
+          {/* Role Toggle */}
+          <div className="mb-5 flex gap-2 rounded-2xl bg-slate-100 p-1">
+            {["candidate", "employer"].map((r) => (
+              <button key={r} onClick={() => setSelRole(r)}
+                className={`flex-1 rounded-xl py-2.5 text-sm font-bold capitalize transition-all btn-press ${selRole === r ? "bg-white text-slate-950 shadow-md" : "text-slate-500 hover:text-slate-700"}`}>
+                {r === "candidate" ? "👤 Job Seeker" : "🏢 Employer"}
+              </button>
+            ))}
+          </div>
+
+          {errors.general && (
+            <div className="mb-4 flex items-center gap-2.5 rounded-2xl bg-red-50 p-4 ring-1 ring-red-100">
+              <AlertCircle size={17} className="text-red-500 shrink-0" />
+              <p className="text-sm font-bold text-red-700">{errors.general}</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {[
+              { f: "name", placeholder: "Full Name", icon: UserCheck },
+              { f: "email", placeholder: "Email Address", icon: Mail, type: "email" },
+              { f: "phone", placeholder: "Mobile Number (10 digits)", icon: Phone },
+            ].map(({ f, placeholder, icon: Icon, type = "text" }) => (
+              <div key={f}>
+                <div className={`flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 ring-1 transition-all ${errors[f] ? "ring-red-400 bg-red-50" : "ring-slate-200 focus-within:ring-blue-500"}`}>
+                  <Icon size={17} className="text-slate-400 shrink-0" />
+                  <input type={type} placeholder={placeholder} value={form[f]} onChange={(e) => upd(f, e.target.value)}
+                    className="w-full bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400" />
+                </div>
+                {errors[f] && <p className="mt-1 text-xs font-bold text-red-500 flex items-center gap-1"><AlertCircle size={11} /> {errors[f]}</p>}
+              </div>
+            ))}
+            <div>
+              <div className={`flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 ring-1 transition-all ${errors.password ? "ring-red-400 bg-red-50" : "ring-slate-200 focus-within:ring-blue-500"}`}>
+                <LockKeyhole size={17} className="text-slate-400 shrink-0" />
+                <input type={showPass ? "text" : "password"} placeholder="Password (min 6 chars)" value={form.password} onChange={(e) => upd("password", e.target.value)}
+                  className="w-full bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400" />
+                <button onClick={() => setShowPass(!showPass)} className="text-slate-400 hover:text-slate-600 shrink-0"><Eye size={17} /></button>
+              </div>
+              {errors.password && <p className="mt-1 text-xs font-bold text-red-500 flex items-center gap-1"><AlertCircle size={11} /> {errors.password}</p>}
+            </div>
+            <div>
+              <div className={`flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 ring-1 transition-all ${errors.confirm ? "ring-red-400 bg-red-50" : "ring-slate-200 focus-within:ring-blue-500"}`}>
+                <LockKeyhole size={17} className="text-slate-400 shrink-0" />
+                <input type="password" placeholder="Confirm Password" value={form.confirm} onChange={(e) => upd("confirm", e.target.value)}
+                  className="w-full bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400" />
+              </div>
+              {errors.confirm && <p className="mt-1 text-xs font-bold text-red-500 flex items-center gap-1"><AlertCircle size={11} /> {errors.confirm}</p>}
+            </div>
+          </div>
+
+          <button onClick={handleRegister} disabled={loading}
+            className="mt-5 w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-4 font-bold text-white text-sm shadow-lg shadow-blue-600/25 transition-all disabled:opacity-60 btn-press flex items-center justify-center gap-2">
+            {loading ? <><RefreshCw size={16} className="animate-spin" /> Creating account...</> : <>Create Account <ArrowRight size={17} /></>}
+          </button>
+          <p className="mt-4 text-center text-xs font-semibold text-slate-400">🔒 Data secure. Never sold to third parties.</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -953,10 +1202,11 @@ function Footer() {
 // ─── Page Router ──────────────────────────────────────────────────
 function PageContent(props) {
   const { page } = props;
-  if (page === "login") return <LoginPage setRole={props.setRole} setPage={props.setPage} />;
-  if (page === "register") return (
-  <RegisterPage setRole={setRole} setPage={setPage} showToast={showToast} />
-   );
+  if (page === "login") return <LoginPage setRole={props.setRole} setPage={props.setPage} showToast={props.showToast} />;
+  // ✅ SAHI
+if (page === "register") return (
+  <RegisterPage setRole={props.setRole} setPage={props.setPage} showToast={props.showToast} />
+);
   if (page === "candidate") return <CandidateDashboard applications={props.applications} />;
   if (page === "employer") return <EmployerDashboard jobs={props.jobs} setJobs={props.setJobs} showToast={props.showToast} />;
   if (page === "admin") return <AdminDashboard jobs={props.jobs} setJobs={props.setJobs} showToast={props.showToast} />;
