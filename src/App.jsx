@@ -21,19 +21,9 @@ const categories = [
   { title: "BPO / Customer Support", icon: Headphones, jobs: "1,780", desc: "Voice, Non-Voice, Chat, Backend", gradient: "from-violet-500 to-purple-400", bg: "bg-violet-50", text: "text-violet-600" },
 ];
 
-const starterJobs = [
-  { id: 1, title: "Software QA Tester", company: "TechNova Solutions", category: "IT / Software", location: "Bengaluru", salary: "₹6-10 LPA", exp: "2-5 Years", tag: "Actively Hiring", status: "Approved", applicants: 18, description: "Manual and automation testing role for web and mobile applications." },
-  { id: 2, title: "Medical Representative", company: "Apex Pharma", category: "Pharma", location: "Lucknow", salary: "₹3-5 LPA", exp: "1-3 Years", tag: "New", status: "Approved", applicants: 24, description: "Promote pharma products and manage doctor relationships." },
-  { id: 3, title: "Relationship Manager", company: "Prime Bank Services", category: "Banking / Finance", location: "Delhi NCR", salary: "₹4-8 LPA", exp: "2-4 Years", tag: "Verified", status: "Approved", applicants: 31, description: "Manage customer portfolio and banking product sales." },
-  { id: 4, title: "Sales Executive", company: "GrowthEdge", category: "Sales & Marketing", location: "Mumbai", salary: "₹3-7 LPA", exp: "1-4 Years", tag: "Urgent", status: "Approved", applicants: 16, description: "Field sales role for B2B customer acquisition." },
-  { id: 5, title: "Hospital Front Desk Executive", company: "CarePlus Clinic", category: "Healthcare", location: "Pune", salary: "₹2-4 LPA", exp: "0-2 Years", tag: "Freshers", status: "Approved", applicants: 22, description: "Patient handling, appointment management and billing support." },
-  { id: 6, title: "Customer Support Associate", company: "VoiceBridge", category: "BPO / Customer Support", location: "Noida", salary: "₹2.5-4.5 LPA", exp: "0-3 Years", tag: "Walk-in", status: "Approved", applicants: 40, description: "Voice and chat support for domestic customers." },
-];
-
-const initialApplications = [
-  { id: 101, jobTitle: "Software QA Tester", company: "TechNova Solutions", status: "Viewed" },
-  { id: 102, jobTitle: "Relationship Manager", company: "Prime Bank Services", status: "Interview" },
-];
+const starterJobs = [ ];
+ 
+const initialApplications = [ ];
 
 // ─── Global Styles ────────────────────────────────────────────────
 const GlobalStyles = () => (
