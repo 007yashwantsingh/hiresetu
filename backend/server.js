@@ -409,3 +409,6 @@ app.get("/api/admin/analytics", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`HireSetu backend running on http://localhost:${PORT}`);
 });
+
+const authRoutes = require("./routes/auth");
+app.use("/api/auth", authRoutes);
