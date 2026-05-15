@@ -322,36 +322,73 @@ function HomePage({ setPage, setSelectedCategory }) {
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#0d1b3e] to-blue-950 text-white hero-grid">
         <div className="absolute left-1/4 top-0 h-[500px] w-[500px] -translate-y-1/4 rounded-full bg-blue-600/20 blur-[100px] animate-pulse-glow" />
         <div className="absolute right-1/4 bottom-0 h-96 w-96 translate-y-1/4 rounded-full bg-violet-500/15 blur-[80px] animate-pulse-glow" style={{animationDelay:"2s"}} />
-        <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28 text-center">
-          <div className="inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/8 px-5 py-2.5 text-xs font-bold text-blue-200 backdrop-blur mb-8">
-            <ShieldCheck size={15} className="text-blue-400" /> Verified hiring across 6 focused industries
+        <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-2">
+          <div className="animate-fade-up">
+            <div className="mb-6 inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/8 px-5 py-2.5 text-xs font-bold text-blue-200 backdrop-blur">
+              <ShieldCheck size={15} className="text-blue-400" /> Verified hiring across 6 focused industries
+            </div>
+            <h2 className="font-display max-w-3xl text-5xl font-black leading-[1.05] tracking-tight sm:text-6xl md:text-7xl">
+              Your Career.<br /><span className="text-blue-300">One Smart</span><br />Platform.
+            </h2>
+            <p className="mt-6 max-w-lg text-base leading-8 text-slate-400">
+              Discover category-based jobs across Pharma, IT, Banking, Sales, Healthcare and BPO — with pre-screened candidates and expert placement support.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <button onClick={() => setPage("jobs")} className="flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-4 text-base font-bold text-white shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/50 transition-all btn-press">
+                Find Jobs <Search size={18} />
+              </button>
+              <button onClick={() => setPage("register")} className="flex items-center justify-center gap-2.5 rounded-2xl border border-white/10 bg-white/8 px-8 py-4 text-base font-bold text-white backdrop-blur hover:bg-white/15 transition-all btn-press">
+                Post a Job <ArrowRight size={18} />
+              </button>
+            </div>
+            <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[{icon:ShieldCheck,text:"Pre-screened candidates"},{icon:Zap,text:"6 industry verticals"},{icon:CheckCircle2,text:"Commission-only model"}].map(item => (
+                <div key={item.text} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/5 px-4 py-3 backdrop-blur">
+                  <item.icon size={16} className="text-blue-300 shrink-0" />
+                  <p className="text-xs font-bold text-slate-300">{item.text}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <h2 className="font-display text-5xl font-black leading-[1.05] tracking-tight sm:text-6xl md:text-7xl max-w-4xl mx-auto">
-            Your Career.<br /><span className="text-blue-300">One Smart</span> Platform.
-          </h2>
-          <p className="mt-6 max-w-xl mx-auto text-base leading-8 text-slate-400">
-            Discover category-based jobs across Pharma, IT, Banking, Sales, Healthcare and BPO — with pre-screened candidates and expert placement support.
-          </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row justify-center">
-            <button onClick={() => setPage("jobs")} className="flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-4 text-base font-bold text-white shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/50 transition-all btn-press">
-              Browse Jobs <Search size={18} />
-            </button>
-            <button onClick={() => setPage("register")} className="flex items-center justify-center gap-2.5 rounded-2xl border border-white/10 bg-white/8 px-8 py-4 text-base font-bold text-white backdrop-blur hover:bg-white/15 transition-all btn-press">
-              Post a Job <ArrowRight size={18} />
-            </button>
-          </div>
-          <div className="mt-14 grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
-            {[
-              { icon:Users, title:"Register & Apply", desc:"Create your profile and apply to verified jobs in minutes" },
-              { icon:ShieldCheck, title:"We Screen for You", desc:"HireSetu team verifies candidates before sending to companies" },
-              { icon:Trophy, title:"Get Hired", desc:"Companies pay us only when you successfully join" },
-            ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-white/8 bg-white/5 p-5 backdrop-blur text-left">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 mb-3"><item.icon size={20} className="text-blue-300" /></div>
-                <p className="font-display font-black text-white text-sm">{item.title}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-400 leading-5">{item.desc}</p>
+
+          {/* Live Hiring Board Widget */}
+          <div className="relative mx-auto w-full max-w-md lg:max-w-none animate-fade-up" style={{animationDelay:".15s"}}>
+            <div className="animate-float rounded-[2.5rem] border border-white/10 bg-white/8 p-3 shadow-2xl backdrop-blur-xl">
+              <div className="overflow-hidden rounded-[2rem] bg-slate-50">
+                <div className="bg-gradient-to-br from-slate-950 to-blue-950 p-5 text-white">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 shadow-lg"><Briefcase size={22} /></div>
+                      <div><h3 className="font-display text-lg font-black">Live Hiring Board</h3><p className="text-xs font-semibold text-blue-200">Fresh jobs across top industries</p></div>
+                    </div>
+                    <div className="rounded-2xl bg-white/10 p-2.5"><Bell size={18} /></div>
+                  </div>
+                  <div className="mt-4 rounded-2xl bg-emerald-500/20 px-4 py-3 ring-1 ring-emerald-400/30">
+                    <p className="text-xs font-black text-emerald-300">🚀 Beta Launch — Accepting testers</p>
+                    <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Register now and explore all features</p>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <div className="rounded-2xl bg-amber-50 p-3.5 ring-1 ring-amber-100">
+                    <div className="flex items-start gap-3">
+                      <Zap className="mt-0.5 text-orange-500 shrink-0" size={18} />
+                      <div><p className="text-sm font-black text-amber-900">6 industry categories live</p><p className="text-xs font-semibold text-amber-700 mt-0.5">Pharma · IT · Banking · Sales · Healthcare · BPO</p></div>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {categories.slice(0,4).map(cat => {
+                      const Icon = cat.icon;
+                      return (
+                        <button key={cat.title} onClick={() => { setSelectedCategory(cat.title); setPage("jobs"); }} className="rounded-2xl bg-white p-3.5 text-left shadow-sm ring-1 ring-slate-200 card-hover btn-press">
+                          <div className={`mb-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${cat.gradient} text-white`}><Icon size={16} /></div>
+                          <p className="text-xs font-black text-slate-950">{cat.title}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
