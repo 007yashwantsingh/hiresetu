@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { LoginPage, RegisterPage } from "./AuthPages";
 import {
   Briefcase, Building2, Users, ShieldCheck, ArrowRight, Search,
   Stethoscope, Landmark, Headphones, TrendingUp, Pill, Code2,
@@ -115,12 +116,12 @@ function Navbar({ setPage, role, setRole }) {
           </nav>
 
           <div className="flex items-center gap-2">
-            {!loggedIn ? (
-              <>
-                <button onClick={() => navTo("login")} className="hidden rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors sm:block btn-press">Login</button>
-                <button onClick={() => navTo("login")} className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all btn-press">Register</button>
-              </>
-            ) : (
+         {!loggedIn ? (
+        <>
+      <button onClick={() => navTo("login")} className="hidden rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors sm:block btn-press">Login</button>
+      <button onClick={() => navTo("register")} className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all btn-press">Register</button>
+       </>
+        ) : (
               <>
                 <button onClick={goDashboard} className={`rounded-xl bg-gradient-to-r ${roleColor[role] || "from-blue-600 to-indigo-600"} px-4 py-2 text-xs font-black text-white uppercase tracking-wider btn-press`}>{role}</button>
                 <button onClick={logout} className="rounded-xl bg-slate-100 p-2.5 text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors btn-press"><LogOut size={18} /></button>
@@ -433,51 +434,7 @@ function JobsSection({ setPage }) {
 }
 
 // ─── Login Page ───────────────────────────────────────────────────
-function LoginPage({ setRole, setPage }) {
-  function loginAs(nextRole) {
-    setRole(nextRole);
-    if (nextRole === "candidate") setPage("candidate");
-    if (nextRole === "employer") setPage("employer");
-    if (nextRole === "admin") setPage("admin");
-  }
-  return (
-    <section className="min-h-[calc(100vh-76px)] bg-slate-50 px-4 py-14 sm:px-6">
-      <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
-        <div className="animate-fade-up">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Role Based Access</p>
-          <h2 className="font-display mt-3 text-4xl font-black tracking-tight text-slate-950 md:text-5xl">Login to your dashboard.</h2>
-          <p className="mt-5 text-base leading-8 text-slate-500">Candidate, Employer, and Admin each get their own tailored dashboard with exactly the right tools.</p>
-          <div className="mt-8 rounded-3xl bg-blue-50 p-5 ring-1 ring-blue-100">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="mt-0.5 text-blue-600 shrink-0" size={20} />
-              <div>
-                <p className="font-bold text-slate-950">Access is controlled by user role</p>
-                <p className="mt-1 text-sm font-semibold text-slate-500">Role-based dashboards with Firebase Auth — demo mode active.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[2rem] bg-white p-6 shadow-2xl shadow-slate-950/8 ring-1 ring-slate-200 animate-fade-up" style={{ animationDelay: ".1s" }}>
-          <h3 className="font-display text-2xl font-black text-slate-950">Choose your role</h3>
-          <p className="mt-1.5 text-sm font-semibold text-slate-400">Demo login for role-based dashboard routing</p>
-          <div className="mt-6 grid gap-4">
-            <RoleButton onClick={() => loginAs("candidate")} icon={Users} title="Login as Candidate" desc="Apply, save jobs, track applications" color="blue" />
-            <RoleButton onClick={() => loginAs("employer")} icon={Building2} title="Login as Employer" desc="Post jobs, view applicants, shortlist" color="emerald" />
-            <RoleButton onClick={() => loginAs("admin")} icon={UserCog} title="Login as Admin" desc="Manage candidates, jobs, post directly" dark />
-          </div>
-          <div className="mt-6 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-200 space-y-3">
-            {[{icon: Mail, text: "Email input coming here"},{icon: LockKeyhole, text: "Password input coming here"}].map((item) => (
-              <div key={item.text} className="flex items-center gap-3 rounded-2xl bg-white p-3 ring-1 ring-slate-100">
-                <item.icon size={17} className="text-slate-400" />
-                <span className="text-sm font-semibold text-slate-400">{item.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+
 
 function RoleButton({ onClick, icon: Icon, title, desc, dark, color }) {
   const base = dark
@@ -997,6 +954,9 @@ function Footer() {
 function PageContent(props) {
   const { page } = props;
   if (page === "login") return <LoginPage setRole={props.setRole} setPage={props.setPage} />;
+  if (page === "register") return (
+  <RegisterPage setRole={setRole} setPage={setPage} showToast={showToast} />
+   );
   if (page === "candidate") return <CandidateDashboard applications={props.applications} />;
   if (page === "employer") return <EmployerDashboard jobs={props.jobs} setJobs={props.setJobs} showToast={props.showToast} />;
   if (page === "admin") return <AdminDashboard jobs={props.jobs} setJobs={props.setJobs} showToast={props.showToast} />;
