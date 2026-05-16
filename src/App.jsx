@@ -9,7 +9,7 @@ import {
   Star, Trophy, Target, Globe, Phone, Activity, RefreshCw, Trash2,
 } from "lucide-react";
 
-const API = "https://hiresetu-u4ot.onrender.com";
+const API = "https://backend-gamma-one-40.vercel.app";
 
 const categories = [
   { title: "Pharma", icon: Pill, desc: "Production, QA, R&D, Medical Rep", gradient: "from-blue-500 to-cyan-400" },
@@ -495,7 +495,7 @@ function JobsPage({ jobs, selectedCategory, setSelectedCategory, role, setRole, 
             <div className="mb-5 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
               <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 ring-1 ring-slate-200 focus-within:ring-blue-500 transition-all">
                 <Search size={18} className="text-slate-400 shrink-0" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search jobs, company, location..." className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400" />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search jobs, title, location..." className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400" />
               </div>
               {filtered.length > 0 && <p className="mt-3 px-1 text-xs font-bold text-slate-400">{filtered.length} job{filtered.length!==1?"s":""} found</p>}
             </div>
@@ -507,7 +507,9 @@ function JobsPage({ jobs, selectedCategory, setSelectedCategory, role, setRole, 
                     <JobTag tag={job.tag} />
                   </div>
                   <h3 className="font-display text-lg font-black text-slate-950">{job.title}</h3>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">{job.company}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                     {role === "candidate" ? "Confidential Hiring Partner" : job.company}
+                   </p>
                   {job.description && <p className="mt-3 text-sm leading-6 text-slate-500">{job.description}</p>}
                   <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs font-semibold text-slate-500">
                     {job.location && <span className="flex items-center gap-1.5"><MapPin size={13} />{job.location}</span>}
@@ -538,40 +540,540 @@ function JobsPage({ jobs, selectedCategory, setSelectedCategory, role, setRole, 
 }
 
 // ─── Candidate Dashboard ──────────────────────────────────────────
-function CandidateDashboard({ applications }) {
+function CandidateDashboard({
+  applications,
+  candidateResume,
+  setCandidateResume,
+  candidateProfile,
+  setCandidateProfile,
+  showToast,
+}) {
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
+
+  const currentUser = (() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("hs_user") || "{}");
+      return {
+        id: saved.id || saved._id || saved.email || "demo-user",
+        name: saved.name || "Candidate User",
+        email: saved.email || "candidate@test.com",
+        phone: saved.phone || "",
+      };
+    } catch {
+      return {
+        id: "demo-user",
+        name: "Candidate User",
+        email: "candidate@test.com",
+        phone: "",
+      };
+    }
+  })();
+
+  const emptyForm = {
+    phone: currentUser.phone || "",
+    skills: "",
+    currentCompany: "",
+    expectedSalary: "",
+    preferredCategory: "IT / Software",
+    experience: "",
+    summary: "",
+  };
+
+  const [profileForm, setProfileForm] = useState(emptyForm);
+
+  function updateProfileForm(field, value) {
+    setProfileForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function hydrateProfileForm(profile) {
+    if (!profile) return;
+
+    setProfileForm({
+      phone: profile.phone || currentUser.phone || "",
+      skills: Array.isArray(profile.skills)
+        ? profile.skills.join(", ")
+        : profile.skills || "",
+      currentCompany: profile.currentCompany || "",
+      expectedSalary: profile.expectedSalary || "",
+      preferredCategory: profile.preferredCategory || "IT / Software",
+      experience: profile.experience || "",
+      summary: profile.summary || "",
+    });
+  }
+
+  function calculateProfileStrength(profile) {
+    if (!profile) return 0;
+
+    const completed = [
+      profile.email,
+      profile.phone,
+      Array.isArray(profile.skills) ? profile.skills.length > 0 : Boolean(profile.skills),
+      profile.currentCompany,
+      profile.expectedSalary,
+      profile.preferredCategory,
+      profile.experience,
+      profile.summary,
+      profile.resumeUrl || profile.resumeFileName || candidateResume?.name,
+    ].filter(Boolean).length;
+
+    return Math.min(100, Math.round((completed / 9) * 100));
+  }
+
+  const profileStrength =
+    candidateProfile?.profileStrength || calculateProfileStrength(candidateProfile);
+
+  const hasSavedProfile = Boolean(
+    candidateProfile &&
+      (candidateProfile.skills?.length ||
+        candidateProfile.currentCompany ||
+        candidateProfile.expectedSalary ||
+        candidateProfile.experience ||
+        candidateProfile.summary)
+  );
+
+  const resumeName =
+    candidateProfile?.resumeFileName || candidateResume?.name || "";
+
+  useEffect(() => {
+    async function fetchCandidateProfile() {
+      if (!currentUser.email) return;
+
+      setLoadingProfile(true);
+
+      try {
+        const res = await fetch(
+          `${API}/api/candidate/profile/${encodeURIComponent(currentUser.email)}`
+        );
+        const data = await res.json();
+
+        if (data.ok && data.profile) {
+          setCandidateProfile?.(data.profile);
+          hydrateProfileForm(data.profile);
+
+          if (data.profile.resumeFileName) {
+            setCandidateResume?.({
+              name: data.profile.resumeFileName,
+              url: data.profile.resumeUrl,
+              uploaded: true,
+            });
+          }
+        }
+      } catch (err) {
+        console.log("Candidate profile not loaded yet", err);
+      }
+
+      setLoadingProfile(false);
+    }
+
+    fetchCandidateProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function uploadResume(file) {
+    if (!file) return;
+
+    const allowedTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    const allowedExt = [".pdf", ".doc", ".docx"].some((ext) =>
+      file.name.toLowerCase().endsWith(ext)
+    );
+
+    if (!allowedTypes.includes(file.type) && !allowedExt) {
+      showToast?.("Only PDF, DOC or DOCX resume allowed", "error");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast?.("Resume must be under 5 MB", "error");
+      return;
+    }
+
+    setUploadingResume(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("resume", file);
+      formData.append("email", currentUser.email);
+      formData.append("userId", currentUser.id);
+      formData.append("name", currentUser.name);
+      formData.append("phone", profileForm.phone || currentUser.phone || "");
+
+      const res = await fetch(`${API}/api/candidate/resume`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        showToast?.(data.message || "Resume upload failed", "error");
+        setUploadingResume(false);
+        return;
+      }
+
+      setCandidateResume?.({
+        name: data.profile?.resumeFileName || file.name,
+        url: data.profile?.resumeUrl,
+        uploaded: true,
+      });
+
+      setCandidateProfile?.(data.profile);
+      hydrateProfileForm(data.profile);
+      showToast?.("Resume uploaded successfully", "success");
+    } catch (err) {
+      console.error(err);
+      showToast?.("Resume upload failed. Check backend/Cloudinary.", "error");
+    }
+
+    setUploadingResume(false);
+  }
+
+  async function saveCandidateProfile() {
+    if (!currentUser.email) {
+      showToast?.("Please login again before saving profile", "error");
+      return;
+    }
+
+    const skills = profileForm.skills
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (!profileForm.phone.trim()) {
+      showToast?.("Phone number is required", "error");
+      return;
+    }
+
+    if (!skills.length) {
+      showToast?.("Please add at least one skill", "error");
+      return;
+    }
+
+    if (!profileForm.experience.trim()) {
+      showToast?.("Experience is required", "error");
+      return;
+    }
+
+    setSavingProfile(true);
+
+    try {
+      const res = await fetch(`${API}/api/candidate/profile`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          name: currentUser.name,
+          email: currentUser.email,
+          phone: profileForm.phone.trim(),
+          skills,
+          currentCompany: profileForm.currentCompany.trim(),
+          expectedSalary: profileForm.expectedSalary.trim(),
+          preferredCategory: profileForm.preferredCategory,
+          experience: profileForm.experience.trim(),
+          summary: profileForm.summary.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        showToast?.(data.message || "Failed to save profile", "error");
+        setSavingProfile(false);
+        return;
+      }
+
+      setCandidateProfile?.(data.profile);
+      hydrateProfileForm(data.profile);
+      setProfileOpen(false);
+      showToast?.("Profile saved successfully", "success");
+    } catch (err) {
+      console.error(err);
+      showToast?.("Profile save failed. Check backend connection.", "error");
+    }
+
+    setSavingProfile(false);
+  }
+
   return (
-    <DashboardShell title="Candidate Dashboard" subtitle="Apply, save and track your job applications" badge="Candidate" badgeColor="from-blue-600 to-indigo-600">
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-        <StatCard icon={Send} value={applications.length} label="Applications" color="bg-blue-600" />
-        <StatCard icon={Eye} value={0} label="Profile Views" color="bg-emerald-600" />
-        <StatCard icon={CalendarCheck} value={0} label="Interviews" color="bg-orange-500" />
-        <StatCard icon={Bookmark} value={0} label="Saved Jobs" color="bg-violet-600" />
-      </div>
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="font-display text-lg font-black text-slate-950">Profile Strength</h3>
-            <span className="font-black text-slate-400">0%</span>
+    <>
+      <DashboardShell
+        title="Candidate Dashboard"
+        subtitle="Apply, save and track your job applications"
+        badge="Candidate"
+        badgeColor="from-blue-600 to-indigo-600"
+      >
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <StatCard icon={Send} value={applications.length} label="Applications" color="bg-blue-600" />
+          <StatCard icon={Eye} value={profileStrength ? 1 : 0} label="Profile Views" color="bg-emerald-600" />
+          <StatCard icon={CalendarCheck} value={0} label="Interviews" color="bg-orange-500" />
+          <StatCard icon={Bookmark} value={0} label="Saved Jobs" color="bg-violet-600" />
+        </div>
+
+        <div className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="font-display text-lg font-black text-slate-950">
+                Resume Upload
+              </h3>
+
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Resume is mandatory before applying to jobs.
+              </p>
+
+              {resumeName ? (
+                <p className="mt-3 break-all text-sm font-bold text-emerald-600">
+                  Uploaded: {resumeName}
+                </p>
+              ) : (
+                <p className="mt-3 text-sm font-bold text-red-500">
+                  No resume uploaded yet
+                </p>
+              )}
+
+              {candidateProfile?.resumeUrl && (
+                <a
+                  href={candidateProfile.resumeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-block text-xs font-bold text-blue-600 hover:underline"
+                >
+                  View uploaded resume
+                </a>
+              )}
+            </div>
+
+            <label className={`cursor-pointer rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-center text-sm font-bold text-white shadow-lg shadow-blue-600/20 btn-press ${uploadingResume ? "opacity-70" : ""}`}>
+              {uploadingResume ? "Uploading..." : resumeName ? "Replace Resume" : "Upload Resume"}
+
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                className="hidden"
+                disabled={uploadingResume}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadResume(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
           </div>
-          <div className="h-2.5 rounded-full bg-slate-100"><div className="h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600" style={{width:"0%"}} /></div>
-          <p className="mt-4 text-sm font-semibold text-slate-500">Complete your profile to get noticed by top employers.</p>
-          <button className="mt-5 w-full rounded-2xl bg-gradient-to-r from-slate-950 to-blue-950 py-3 font-bold text-white text-sm btn-press">Complete Profile</button>
         </div>
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-          <h3 className="font-display text-lg font-black text-slate-950 mb-5">Your Applications</h3>
-          {applications.length === 0 ? (
-            <div className="text-center py-8"><Send size={32} className="mx-auto text-slate-300 mb-3" /><p className="text-sm font-bold text-slate-400">No applications yet</p><p className="mt-1 text-xs font-semibold text-slate-400">Browse jobs and apply to get started</p></div>
-          ) : (
-            <div className="space-y-3">{applications.map((a) => (
-              <div key={a.id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                <div><p className="font-bold text-slate-950 text-sm">{a.jobTitle}</p><p className="text-xs font-semibold text-slate-400 mt-0.5">{a.company}</p></div>
-                <StatusBadge status={a.status} />
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="font-display text-lg font-black text-slate-950">
+                Profile Strength
+              </h3>
+
+              <span className="font-black text-slate-400">
+                {loadingProfile ? "..." : `${profileStrength}%`}
+              </span>
+            </div>
+
+            <div className="h-2.5 rounded-full bg-slate-100">
+              <div
+                className="h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all"
+                style={{ width: `${profileStrength}%` }}
+              />
+            </div>
+
+            <p className="mt-4 text-sm font-semibold text-slate-500">
+              {hasSavedProfile
+                ? "Your profile is saved. Keep it updated for better shortlisting."
+                : "Complete your profile to get noticed by top employers."}
+            </p>
+
+            {candidateProfile?.skills?.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {candidateProfile.skills.slice(0, 6).map((skill) => (
+                  <span
+                    key={skill}
+                    className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700"
+                  >
+                    {skill}
+                  </span>
+                ))}
               </div>
-            ))}</div>
-          )}
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                hydrateProfileForm(candidateProfile);
+                setProfileOpen(true);
+              }}
+              className="mt-5 w-full rounded-2xl bg-gradient-to-r from-slate-950 to-blue-950 py-3 font-bold text-white text-sm btn-press"
+            >
+              {hasSavedProfile ? "Edit Profile" : "Complete Profile"}
+            </button>
+          </div>
+
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <h3 className="font-display text-lg font-black text-slate-950 mb-5">
+              Your Applications
+            </h3>
+
+            {applications.length === 0 ? (
+              <div className="text-center py-8">
+                <Send size={32} className="mx-auto text-slate-300 mb-3" />
+                <p className="text-sm font-bold text-slate-400">
+                  No applications yet
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">
+                  Browse jobs and apply to get started
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {applications.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100"
+                  >
+                    <div>
+                      <p className="font-bold text-slate-950 text-sm">
+                        {a.jobTitle}
+                      </p>
+                      <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                        {a.company}
+                      </p>
+                    </div>
+
+                    <StatusBadge status={a.status} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </DashboardShell>
+      </DashboardShell>
+
+      {profileOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl animate-fade-up">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-2xl font-black text-slate-950">
+                  {hasSavedProfile ? "Edit Profile" : "Complete Profile"}
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  This information will be used by HireSetu admin for screening.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setProfileOpen(false)}
+                className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input
+                value={currentUser.name}
+                readOnly
+                className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-500 outline-none ring-1 ring-slate-200"
+              />
+
+              <input
+                value={currentUser.email}
+                readOnly
+                className="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-500 outline-none ring-1 ring-slate-200"
+              />
+
+              <input
+                value={profileForm.phone}
+                onChange={(e) => updateProfileForm("phone", e.target.value)}
+                placeholder="Phone Number"
+                className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-blue-500"
+              />
+
+              <select
+                value={profileForm.preferredCategory}
+                onChange={(e) =>
+                  updateProfileForm("preferredCategory", e.target.value)
+                }
+                className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-blue-500"
+              >
+                {categories.map((cat) => (
+                  <option key={cat.title} value={cat.title}>
+                    {cat.title}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                value={profileForm.skills}
+                onChange={(e) => updateProfileForm("skills", e.target.value)}
+                placeholder="Skills, comma separated"
+                className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-blue-500 sm:col-span-2"
+              />
+
+              <input
+                value={profileForm.currentCompany}
+                onChange={(e) =>
+                  updateProfileForm("currentCompany", e.target.value)
+                }
+                placeholder="Current Company"
+                className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-blue-500"
+              />
+
+              <input
+                value={profileForm.experience}
+                onChange={(e) => updateProfileForm("experience", e.target.value)}
+                placeholder="Experience, e.g. 3 years"
+                className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-blue-500"
+              />
+
+              <input
+                value={profileForm.expectedSalary}
+                onChange={(e) =>
+                  updateProfileForm("expectedSalary", e.target.value)
+                }
+                placeholder="Expected Salary, e.g. ₹6 LPA"
+                className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-blue-500 sm:col-span-2"
+              />
+
+              <textarea
+                value={profileForm.summary}
+                onChange={(e) => updateProfileForm("summary", e.target.value)}
+                placeholder="Professional Summary"
+                className="min-h-28 resize-none rounded-2xl bg-slate-50 p-4 text-sm font-semibold outline-none ring-1 ring-slate-200 focus:ring-blue-500 sm:col-span-2"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={saveCandidateProfile}
+              disabled={savingProfile}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 font-bold text-white disabled:opacity-60"
+            >
+              {savingProfile ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Profile"
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -849,7 +1351,17 @@ function PageContent(props) {
   const { page } = props;
   if (page==="login") return <LoginPage setRole={props.setRole} setPage={props.setPage} showToast={props.showToast} />;
   if (page==="register") return <RegisterPage setRole={props.setRole} setPage={props.setPage} showToast={props.showToast} />;
-  if (page==="candidate") return <CandidateDashboard applications={props.applications} />;
+  if (page==="candidate")
+    return (
+      <CandidateDashboard
+        applications={props.applications}
+        candidateResume={props.candidateResume}
+        setCandidateResume={props.setCandidateResume}
+        candidateProfile={props.candidateProfile}
+        setCandidateProfile={props.setCandidateProfile}
+        showToast={props.showToast}
+      />
+    );
   if (page==="employer") return <EmployerDashboard jobs={props.jobs} setJobs={props.setJobs} showToast={props.showToast} />;
   if (page==="admin") return <AdminDashboard jobs={props.jobs} setJobs={props.setJobs} showToast={props.showToast} />;
   if (page==="jobs") return <JobsPage jobs={props.jobs} selectedCategory={props.selectedCategory} setSelectedCategory={props.setSelectedCategory} role={props.role} setRole={props.setRole} setPage={props.setPage} applyToJob={props.applyToJob} />;
@@ -864,6 +1376,8 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [candidateResume, setCandidateResume] = useState(null);
+  const [candidateProfile, setCandidateProfile] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showToast = (message, type="success") => { setToast({message,type}); setTimeout(()=>setToast(null),3500); };
@@ -877,14 +1391,32 @@ export default function App() {
   }, []);
 
   const applyToJob = async (job) => {
+
+    if (!candidateResume) {
+      showToast("Please upload your resume before applying.", "error");
+      setPage("candidate");
+        return;
+     }
     try {
-      const res = await fetch(`${API}/api/applications`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ jobId:job._id||job.id, candidateId:1, candidateName:"Demo Candidate", candidateEmail:"demo@gmail.com" }) });
+      const res = await fetch(`${API}/api/applications`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ jobId:job._id||job.id, candidateId:1, candidateName:"Demo Candidate", candidateEmail:"demo@gmail.com", resumeFileName:candidateResume?.name }) });
       const data = await res.json();
       if (!data.ok) { showToast(data.message||"Application failed","error"); return; }
-      setApplications((prev) => [{ id:data.application.id, jobTitle:data.application.jobTitle, company:data.application.company, status:data.application.status },...prev]);
+      setApplications((prev) => [{
+        id:data.application?._id || data.application?.id || Date.now(),
+        jobTitle:data.application?.jobTitle || job.title,
+        company:data.application?.company || "Confidential Hiring Partner",
+        status:data.application?.status || "Applied",
+        resumeFileName:candidateResume?.name
+      },...prev]);
       showToast("Application submitted!","success");
     } catch {
-      setApplications((prev) => [{ id:Date.now(), jobTitle:job.title, company:job.company, status:"Applied" },...prev]);
+      setApplications((prev) => [{
+        id:Date.now(),
+        jobTitle:job.title,
+        company:"Confidential Hiring Partner",
+        status:"Applied",
+        resumeFileName:candidateResume?.name
+      },...prev]);
       showToast("Application submitted (offline mode)","success");
     }
   };
@@ -893,7 +1425,23 @@ export default function App() {
     <main className="min-h-screen bg-white">
       <GlobalStyles />
       <Navbar setPage={setPage} role={role} setRole={setRole} />
-      <PageContent page={page} setPage={setPage} role={role} setRole={setRole} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} jobs={jobs} setJobs={setJobs} applications={applications} applyToJob={applyToJob} showToast={showToast} />
+      <PageContent
+        page={page}
+        setPage={setPage}
+        role={role}
+        setRole={setRole}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+        jobs={jobs}
+        setJobs={setJobs}
+        applications={applications}
+        applyToJob={applyToJob}
+        showToast={showToast}
+        candidateResume={candidateResume}
+        setCandidateResume={setCandidateResume}
+        candidateProfile={candidateProfile}
+        setCandidateProfile={setCandidateProfile}
+      />
       <Toast toast={toast} />
       <Footer />
     </main>
