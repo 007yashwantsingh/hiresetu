@@ -57,18 +57,22 @@ router.post("/profile", async (req, res) => {
       summary,
     } = req.body;
 
-    const profileStrength =
-      [
-        name,
-        email,
-        phone,
-        skills?.length,
-        currentCompany,
-        expectedSalary,
-        preferredCategory,
-        experience,
-        summary,
-      ].filter(Boolean).length * 10;
+    const existingProfile = await CandidateProfile.findOne({ email });
+
+const completedFields = [
+  name,
+  email,
+  phone,
+  skills?.length,
+  currentCompany,
+  expectedSalary,
+  preferredCategory,
+  experience,
+  summary,
+  existingProfile?.resumeUrl,
+].filter(Boolean).length;
+
+const profileStrength = Math.min(completedFields * 10, 100);
 
     const profile = await CandidateProfile.findOneAndUpdate(
       { email },
