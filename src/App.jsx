@@ -1222,31 +1222,118 @@ function EmployerDashboard({ jobs, setJobs, showToast }) {
 function AdminDashboard({ jobs, setJobs, showToast }) {
   const [tab, setTab] = useState("post");
   const [loading, setLoading] = useState(false);
+  const [adminApplications, setAdminApplications] = useState([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
+  const [updatingApplicationId, setUpdatingApplicationId] = useState(null);
 
   async function reloadJobs() {
     setLoading(true);
-    try { const res = await fetch(`${API}/api/admin/jobs`); const data = await res.json(); if(data.ok) setJobs(data.jobs); }
-    catch { showToast("Could not reload jobs","error"); }
+    try {
+      const res = await fetch(`${API}/api/admin/jobs`);
+      const data = await res.json();
+      if (data.ok) setJobs(data.jobs);
+    } catch {
+      showToast("Could not reload jobs", "error");
+    }
     setLoading(false);
   }
 
-  const tabs = [{id:"post",label:"Post Job",icon:PlusCircle},{id:"jobs",label:"Manage Jobs",icon:ClipboardList},{id:"controls",label:"Controls",icon:UserCog}];
+  async function fetchApplications() {
+    setLoadingApplications(true);
+
+    try {
+      const res = await fetch(`${API}/api/admin/applications`);
+      const data = await res.json();
+
+      if (data.ok) {
+        setAdminApplications(data.applications || []);
+      } else {
+        showToast?.(data.message || "Could not load applications", "error");
+      }
+    } catch (err) {
+      console.error("Admin applications fetch error:", err);
+      showToast?.("Could not load applications", "error");
+    }
+
+    setLoadingApplications(false);
+  }
+
+  async function updateApplicationStatus(applicationId, status) {
+    setUpdatingApplicationId(applicationId);
+
+    try {
+      const res = await fetch(`${API}/api/applications/${applicationId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        showToast?.(data.message || "Failed to update application", "error");
+        setUpdatingApplicationId(null);
+        return;
+      }
+
+      setAdminApplications((prev) =>
+        prev.map((app) =>
+          app._id === applicationId || app.id === applicationId
+            ? { ...app, status: data.application?.status || status }
+            : app
+        )
+      );
+
+      showToast?.(`Application marked as ${status}`, "success");
+    } catch (err) {
+      console.error("Application status update error:", err);
+      showToast?.("Failed to update application", "error");
+    }
+
+    setUpdatingApplicationId(null);
+  }
+
+  useEffect(() => {
+    if (tab === "applications") {
+      fetchApplications();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  const tabs = [
+    { id: "post", label: "Post Job", icon: PlusCircle },
+    { id: "jobs", label: "Manage Jobs", icon: ClipboardList },
+    { id: "applications", label: "Applications", icon: FileText },
+    { id: "controls", label: "Controls", icon: UserCog },
+  ];
+
+  const totalApplicants = adminApplications.length;
+  const shortlistedCount = adminApplications.filter((a) => a.status === "Shortlisted").length;
 
   return (
     <DashboardShell title="Admin Dashboard" subtitle="Full control — post jobs, manage listings, oversee platform" badge="Admin" badgeColor="from-rose-500 to-orange-500">
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-        <StatCard icon={Users} value={0} label="Candidates" color="bg-blue-600" />
-        <StatCard icon={Building2} value={0} label="Employers" color="bg-emerald-600" />
-        <StatCard icon={Briefcase} value={jobs.length} label="Total Jobs" color="bg-orange-500" />
-        <StatCard icon={Activity} value={jobs.filter(j=>j.status==="Approved").length} label="Live Jobs" color="bg-violet-600" />
+        <StatCard icon={Users} value={totalApplicants} label="Applications" color="bg-blue-600" />
+        <StatCard icon={Building2} value={jobs.length} label="Total Jobs" color="bg-emerald-600" />
+        <StatCard icon={Briefcase} value={jobs.filter(j=>j.status==="Approved").length} label="Live Jobs" color="bg-orange-500" />
+        <StatCard icon={UserCheck} value={shortlistedCount} label="Shortlisted" color="bg-violet-600" />
       </div>
-      <div className="mt-6 flex gap-2 rounded-3xl bg-slate-100 p-1.5 w-fit">
-        {tabs.map((t) => { const Icon=t.icon; return (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-bold transition-all btn-press ${tab===t.id?"bg-white text-slate-950 shadow-md":"text-slate-500 hover:text-slate-700"}`}>
-            <Icon size={16} />{t.label}
-          </button>
-        ); })}
+
+      <div className="mt-6 flex flex-wrap gap-2 rounded-3xl bg-slate-100 p-1.5 w-fit">
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-bold transition-all btn-press ${tab===t.id?"bg-white text-slate-950 shadow-md":"text-slate-500 hover:text-slate-700"}`}
+            >
+              <Icon size={16} />{t.label}
+            </button>
+          );
+        })}
       </div>
+
       <div className="mt-5">
         {tab==="post" && (
           <div className="grid gap-6 lg:grid-cols-2 animate-fade-up">
@@ -1255,7 +1342,12 @@ function AdminDashboard({ jobs, setJobs, showToast }) {
               <h3 className="font-display text-lg font-black text-slate-950 mb-2">Admin Posting Guide</h3>
               <p className="text-sm font-semibold text-slate-500 mb-5">Jobs posted by Admin go live immediately.</p>
               <div className="space-y-3">
-                {[{icon:Globe,text:"Source jobs from LinkedIn, Naukri, Indeed"},{icon:Target,text:"Post on behalf of companies you're onboarding"},{icon:Users,text:"Candidates apply → you screen → send to HR"},{icon:Trophy,text:"Commission earned on every successful join"}].map((item) => (
+                {[
+                  {icon:Globe,text:"Source jobs from LinkedIn, Naukri, Indeed"},
+                  {icon:Target,text:"Post on behalf of companies you're onboarding"},
+                  {icon:Users,text:"Candidates apply → you screen → send to HR"},
+                  {icon:Trophy,text:"Commission earned on every successful join"},
+                ].map((item) => (
                   <div key={item.text} className="flex items-center gap-3.5 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><item.icon size={18} /></div>
                     <p className="text-sm font-semibold text-slate-700">{item.text}</p>
@@ -1265,6 +1357,7 @@ function AdminDashboard({ jobs, setJobs, showToast }) {
             </div>
           </div>
         )}
+
         {tab==="jobs" && (
           <div className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 animate-fade-up">
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
@@ -1290,11 +1383,140 @@ function AdminDashboard({ jobs, setJobs, showToast }) {
             )}
           </div>
         )}
+
+        {tab==="applications" && (
+          <div className="animate-fade-up">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-display text-xl font-black text-slate-950">Candidate Applications</h3>
+                <p className="mt-1 text-sm font-semibold text-slate-500">Review resumes, shortlist candidates and move applications through your hiring pipeline.</p>
+              </div>
+              <button
+                onClick={fetchApplications}
+                disabled={loadingApplications}
+                className="flex items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-60 btn-press"
+              >
+                <RefreshCw size={15} className={loadingApplications ? "animate-spin" : ""} /> Refresh
+              </button>
+            </div>
+
+            {loadingApplications ? (
+              <div className="rounded-3xl bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
+                <RefreshCw size={28} className="mx-auto mb-3 animate-spin text-blue-600" />
+                <p className="font-bold text-slate-500">Loading applications...</p>
+              </div>
+            ) : adminApplications.length === 0 ? (
+              <div className="rounded-3xl bg-white p-12 text-center shadow-sm ring-1 ring-slate-200">
+                <Send size={34} className="mx-auto mb-3 text-slate-300" />
+                <p className="font-display text-lg font-black text-slate-700">No applications yet</p>
+                <p className="mt-2 text-sm font-semibold text-slate-400">When candidates apply, their profile and resume will appear here.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {adminApplications.map((app) => {
+                  const id = app._id || app.id;
+                  const busy = updatingApplicationId === id;
+
+                  return (
+                    <div key={id} className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 card-hover">
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-display text-xl font-black text-slate-950">
+                              {app.candidateName || "Candidate"}
+                            </h3>
+                            <StatusBadge status={app.status || "Applied"} />
+                          </div>
+
+                          <p className="mt-1 break-all text-sm font-semibold text-slate-500">
+                            {app.candidateEmail || "Email not available"}
+                          </p>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                              {app.jobTitle || "Job title unavailable"}
+                            </span>
+                            {app.company && (
+                              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                                {app.company}
+                              </span>
+                            )}
+                            {app.category && (
+                              <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700">
+                                {app.category}
+                              </span>
+                            )}
+                            {app.resumeFileName && (
+                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                                {app.resumeFileName}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            {app.resumeUrl ? (
+                              <a
+                                href={app.resumeUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 rounded-2xl bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100"
+                              >
+                                <FileText size={15} /> View Resume
+                              </a>
+                            ) : (
+                              <span className="inline-flex items-center gap-2 rounded-2xl bg-red-50 px-4 py-2 text-sm font-bold text-red-600">
+                                <AlertCircle size={15} /> Resume missing
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 lg:justify-end">
+                          <button
+                            onClick={() => updateApplicationStatus(id, "Shortlisted")}
+                            disabled={busy || app.status === "Shortlisted"}
+                            className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-60 btn-press"
+                          >
+                            {busy ? "Updating..." : "Shortlist"}
+                          </button>
+
+                          <button
+                            onClick={() => updateApplicationStatus(id, "Interview")}
+                            disabled={busy || app.status === "Interview"}
+                            className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/20 hover:bg-orange-600 disabled:opacity-60 btn-press"
+                          >
+                            Interview
+                          </button>
+
+                          <button
+                            onClick={() => updateApplicationStatus(id, "Rejected")}
+                            disabled={busy || app.status === "Rejected"}
+                            className="rounded-2xl bg-red-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-red-500/20 hover:bg-red-600 disabled:opacity-60 btn-press"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {tab==="controls" && (
           <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 animate-fade-up">
             <h3 className="font-display text-lg font-black text-slate-950 mb-5">Admin Controls</h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              {[{icon:ClipboardList,text:"Manage All Job Posts",desc:"View, edit, remove listings"},{icon:UserCog,text:"Manage User Roles",desc:"Assign candidate/employer roles"},{icon:BarChart3,text:"Platform Analytics",desc:"Applications, joins, revenue"},{icon:FileText,text:"Hiring Pipeline",desc:"Track candidate → company flow"},{icon:Phone,text:"Outreach Tracker",desc:"HR contacts and follow-ups"},{icon:Trophy,text:"Commission Reports",desc:"Earnings per successful join"}].map((item) => {
+              {[
+                {icon:ClipboardList,text:"Manage All Job Posts",desc:"View, edit, remove listings"},
+                {icon:UserCog,text:"Manage User Roles",desc:"Assign candidate/employer roles"},
+                {icon:BarChart3,text:"Platform Analytics",desc:"Applications, joins, revenue"},
+                {icon:FileText,text:"Hiring Pipeline",desc:"Track candidate → company flow"},
+                {icon:Phone,text:"Outreach Tracker",desc:"HR contacts and follow-ups"},
+                {icon:Trophy,text:"Commission Reports",desc:"Earnings per successful join"},
+              ].map((item) => {
                 const Icon=item.icon;
                 return (
                   <div key={item.text} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100 card-hover cursor-pointer">
@@ -1310,6 +1532,7 @@ function AdminDashboard({ jobs, setJobs, showToast }) {
     </DashboardShell>
   );
 }
+
 
 // ─── Shared UI ────────────────────────────────────────────────────
 function Input({ placeholder, value, onChange, type="text" }) {
