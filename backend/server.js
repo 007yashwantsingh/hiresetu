@@ -543,6 +543,24 @@ app.get("/api/admin/analytics", async (req, res) => {
   }
 });
 
+app.get("/api/admin/applications", async (req, res) => {
+  try {
+    const applications = await Application.find().sort({ createdAt: -1 });
+
+    res.json({
+      ok: true,
+      applications,
+    });
+  } catch (err) {
+    console.error("Admin applications error:", err);
+
+    res.status(500).json({
+      ok: false,
+      message: "Failed to fetch applications",
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`HireSetu backend running on http://localhost:${PORT}`);
 });
