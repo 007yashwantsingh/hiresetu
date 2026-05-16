@@ -552,6 +552,7 @@ function CandidateDashboard({
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
+  const [deletingResume, setDeletingResume] = useState(false);
 
   const currentUser = (() => {
     try {
@@ -735,6 +736,48 @@ function CandidateDashboard({
     setUploadingResume(false);
   }
 
+  async function deleteResume() {
+    if (!currentUser.email) {
+      showToast?.("Please login again before deleting resume", "error");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this resume? You will need to upload a resume again before applying to jobs."
+    );
+
+    if (!confirmed) return;
+
+    setDeletingResume(true);
+
+    try {
+      const res = await fetch(
+        `${API}/api/candidate/resume/${encodeURIComponent(currentUser.email)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        showToast?.(data.message || "Failed to delete resume", "error");
+        setDeletingResume(false);
+        return;
+      }
+
+      setCandidateResume?.(null);
+      setCandidateProfile?.(data.profile || null);
+      hydrateProfileForm(data.profile);
+      showToast?.("Resume deleted successfully", "success");
+    } catch (err) {
+      console.error(err);
+      showToast?.("Resume delete failed. Check backend connection.", "error");
+    }
+
+    setDeletingResume(false);
+  }
+
   async function saveCandidateProfile() {
     if (!currentUser.email) {
       showToast?.("Please login again before saving profile", "error");
@@ -830,35 +873,49 @@ function CandidateDashboard({
               </p>
 
               {resumeName ? (
-                <p className="mt-3 break-all text-sm font-bold text-emerald-600">
-                  Uploaded: {resumeName}
-                </p>
+                <div className="mt-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="break-all text-sm font-bold text-emerald-600">
+                      Uploaded: {resumeName}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={deleteResume}
+                      disabled={deletingResume}
+                      title="Delete resume"
+                      className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-red-50 px-2 text-xs font-black text-red-600 ring-1 ring-red-100 hover:bg-red-100 disabled:opacity-60"
+                    >
+                      {deletingResume ? "..." : "✕"}
+                    </button>
+                  </div>
+
+                  {candidateProfile?.resumeUrl && (
+                    <a
+                      href={candidateProfile.resumeUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-block text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      View uploaded resume
+                    </a>
+                  )}
+                </div>
               ) : (
                 <p className="mt-3 text-sm font-bold text-red-500">
                   No resume uploaded yet
                 </p>
               )}
-
-              {candidateProfile?.resumeUrl && (
-                <a
-                  href={candidateProfile.resumeUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-block text-xs font-bold text-blue-600 hover:underline"
-                >
-                  View uploaded resume
-                </a>
-              )}
             </div>
 
-            <label className={`cursor-pointer rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-center text-sm font-bold text-white shadow-lg shadow-blue-600/20 btn-press ${uploadingResume ? "opacity-70" : ""}`}>
+            <label className={`cursor-pointer rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-center text-sm font-bold text-white shadow-lg shadow-blue-600/20 btn-press ${uploadingResume || deletingResume ? "opacity-70" : ""}`}>
               {uploadingResume ? "Uploading..." : resumeName ? "Replace Resume" : "Upload Resume"}
 
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
                 className="hidden"
-                disabled={uploadingResume}
+                disabled={uploadingResume || deletingResume}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) uploadResume(file);
