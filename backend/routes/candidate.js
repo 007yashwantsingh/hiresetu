@@ -167,4 +167,47 @@ router.post(
   }
 );
 
+// DELETE RESUME
+router.delete("/resume/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+
+    const profile = await CandidateProfile.findOne({ email });
+
+    if (!profile) {
+      return res.status(404).json({
+        ok: false,
+        message: "Profile not found",
+      });
+    }
+
+    if (profile.resumePublicId) {
+      await cloudinary.uploader.destroy(profile.resumePublicId, {
+        resource_type: "raw",
+      });
+    }
+
+    profile.resumeUrl = "";
+    profile.resumePublicId = "";
+    profile.resumeFileName = "";
+
+    profile.profileStrength = Math.max((profile.profileStrength || 100) - 10, 0);
+
+    await profile.save();
+
+    res.json({
+      ok: true,
+      message: "Resume deleted successfully",
+      profile,
+    });
+  } catch (err) {
+    console.error("Delete resume error:", err);
+
+    res.status(500).json({
+      ok: false,
+      message: "Failed to delete resume",
+    });
+  }
+});
+
 export default router;
