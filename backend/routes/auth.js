@@ -1,5 +1,5 @@
 // routes/auth.js
-const express = require("express");
+import express from "express";
 const router = express.Router();
 const User = require("../models/User");
 const { generateToken } = require("../utils/jwt");
@@ -198,4 +198,4 @@ router.patch("/change-password", protect, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

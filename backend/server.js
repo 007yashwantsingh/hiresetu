@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
+import candidateRoutes from "./routes/candidate.js";
 
 dotenv.config();
 
@@ -9,6 +11,8 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+app.use("/api/candidate", candidateRoutes);
 
 const PORT = process.env.PORT || 3001;
 
@@ -19,12 +23,30 @@ mongoose
 
 const userSchema = new mongoose.Schema(
   {
-    name: String,
-    email: { type: String, unique: true },
+    name: { type: String, required: true },
+
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+
+    phone: {
+      type: String,
+      default: "",
+    },
+
+    password: {
+      type: String,
+      required: true,
+    },
+
     role: {
       type: String,
       enum: ["candidate", "employer", "admin"],
-      required: true,
+      default: "candidate",
     },
   },
   { timestamps: true }
@@ -43,7 +65,7 @@ const jobSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["Pending", "Approved", "Rejected"],
-      default: "Pending",
+      default: "Approved",
     },
     applicants: { type: Number, default: 0 },
     tag: { type: String, default: "New" },
@@ -60,6 +82,8 @@ const applicationSchema = new mongoose.Schema(
     jobTitle: String,
     company: String,
     category: String,
+    resumeUrl: String,
+    resumeFileName: String,
     status: {
       type: String,
       enum: [
@@ -88,33 +112,106 @@ app.get("/", (req, res) => {
   });
 });
 
-app.post("/api/auth/login", async (req, res) => {
+// REGISTER
+app.post("/api/auth/register", async (req, res) => {
   try {
-    const { name, email, role } = req.body;
+    const { name, email, phone, password, role } = req.body;
 
-    if (!email || !role) {
+    if (!name || !email || !password) {
       return res.status(400).json({
         ok: false,
-        message: "Email and role are required",
+        message: "Name, email and password are required",
       });
     }
 
-    let user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const existing = await User.findOne({ email: normalizedEmail });
+
+    if (existing) {
+      return res.status(409).json({
+        ok: false,
+        message: "User already exists. Please login.",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      name,
+      email: normalizedEmail,
+      phone: phone || "",
+      password: hashedPassword,
+      role: role || "candidate",
+    });
+
+    res.status(201).json({
+      ok: true,
+      message: "Account created successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error("Register error:", err);
+
+    res.status(500).json({
+      ok: false,
+      message: "Register failed",
+    });
+  }
+});
+
+// LOGIN
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        ok: false,
+        message: "Email and password are required",
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
-      user = await User.create({
-        name: name || "User",
-        email,
-        role,
+      return res.status(404).json({
+        ok: false,
+        message: "User not found. Please register first.",
+      });
+    }
+
+    const matched = await bcrypt.compare(password, user.password);
+
+    if (!matched) {
+      return res.status(401).json({
+        ok: false,
+        message: "Incorrect password",
       });
     }
 
     res.json({
       ok: true,
-      user,
+      message: "Login successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
     });
   } catch (err) {
-    console.error(err);
+    console.error("Login error:", err);
+
     res.status(500).json({
       ok: false,
       message: "Login failed",
@@ -122,11 +219,12 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
+// PUBLIC JOBS - company hidden
 app.get("/api/jobs", async (req, res) => {
   try {
     const { category } = req.query;
 
-    const filter = { status: "Approved" };
+    const filter = {};
 
     if (category) {
       filter.category = category;
@@ -134,11 +232,29 @@ app.get("/api/jobs", async (req, res) => {
 
     const jobs = await Job.find(filter).sort({ createdAt: -1 });
 
+    const safeJobs = jobs.map((job) => ({
+      _id: job._id,
+      title: job.title,
+      category: job.category,
+      location: job.location,
+      salary: job.salary,
+      exp: job.exp,
+      description: job.description,
+      applicants: job.applicants,
+      tag: job.tag,
+      status: job.status,
+      createdAt: job.createdAt,
+      company: "Confidential Hiring Partner",
+      isCompanyHidden: true,
+    }));
+
     res.json({
       ok: true,
-      jobs,
+      jobs: safeJobs,
     });
   } catch (err) {
+    console.error("Fetch public jobs error:", err);
+
     res.status(500).json({
       ok: false,
       message: "Failed to fetch jobs",
@@ -146,6 +262,7 @@ app.get("/api/jobs", async (req, res) => {
   }
 });
 
+// POST JOB
 app.post("/api/jobs", async (req, res) => {
   try {
     const {
@@ -175,18 +292,19 @@ app.post("/api/jobs", async (req, res) => {
       exp,
       description,
       employerId,
-      status: "Pending",
+      status: "Approved",
       applicants: 0,
       tag: "New",
     });
 
     res.status(201).json({
       ok: true,
-      message: "Job submitted for admin approval",
+      message: "Job posted successfully",
       job,
     });
   } catch (err) {
-    console.error(err);
+    console.error("Create job error:", err);
+
     res.status(500).json({
       ok: false,
       message: "Failed to create job",
@@ -194,6 +312,7 @@ app.post("/api/jobs", async (req, res) => {
   }
 });
 
+// ADMIN JOBS - company visible
 app.get("/api/admin/jobs", async (req, res) => {
   try {
     const jobs = await Job.find().sort({ createdAt: -1 });
@@ -247,9 +366,24 @@ app.patch("/api/admin/jobs/:id/status", async (req, res) => {
   }
 });
 
+// APPLY JOB
 app.post("/api/applications", async (req, res) => {
   try {
-    const { jobId, candidateId, candidateName, candidateEmail } = req.body;
+    const {
+      jobId,
+      candidateId,
+      candidateName,
+      candidateEmail,
+      resumeUrl,
+      resumeFileName,
+    } = req.body;
+
+    if (!resumeUrl) {
+      return res.status(400).json({
+        ok: false,
+        message: "Resume is required before applying",
+      });
+    }
 
     const job = await Job.findById(jobId);
 
@@ -277,6 +411,8 @@ app.post("/api/applications", async (req, res) => {
       candidateId,
       candidateName,
       candidateEmail,
+      resumeUrl,
+      resumeFileName,
       jobTitle: job.title,
       company: job.company,
       category: job.category,
@@ -292,7 +428,8 @@ app.post("/api/applications", async (req, res) => {
       application,
     });
   } catch (err) {
-    console.error(err);
+    console.error("Application error:", err);
+
     res.status(500).json({
       ok: false,
       message: "Application failed",
@@ -409,6 +546,3 @@ app.get("/api/admin/analytics", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`HireSetu backend running on http://localhost:${PORT}`);
 });
-
-const authRoutes = require("./routes/auth");
-app.use("/api/auth", authRoutes);
