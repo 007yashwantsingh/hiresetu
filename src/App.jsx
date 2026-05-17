@@ -1671,33 +1671,85 @@ export default function App() {
   }, []);
 
   const applyToJob = async (job) => {
+    let user = {};
 
-    if (!candidateResume) {
+    try {
+      user = JSON.parse(localStorage.getItem("hs_user") || "{}");
+    } catch {
+      user = {};
+    }
+
+    let activeProfile = candidateProfile;
+
+    if (!activeProfile?.resumeUrl && !activeProfile?.resumeFileName && user.email) {
+      try {
+        const profileRes = await fetch(
+          `${API}/api/candidate/profile/${encodeURIComponent(user.email)}`
+        );
+        const profileData = await profileRes.json();
+
+        if (profileData.ok && profileData.profile) {
+          activeProfile = profileData.profile;
+          setCandidateProfile(profileData.profile);
+
+          if (profileData.profile.resumeFileName) {
+            setCandidateResume({
+              name: profileData.profile.resumeFileName,
+              url: profileData.profile.resumeUrl,
+              uploaded: true,
+            });
+          }
+        }
+      } catch (err) {
+        console.log("Could not refresh candidate profile before applying", err);
+      }
+    }
+
+    const resumeUrl = activeProfile?.resumeUrl || candidateResume?.url || "";
+    const resumeFileName =
+      activeProfile?.resumeFileName || candidateResume?.name || "";
+
+    if (!resumeUrl && !resumeFileName) {
       showToast("Please upload your resume before applying.", "error");
       setPage("candidate");
-        return;
-     }
+      return;
+    }
+
     try {
-      const res = await fetch(`${API}/api/applications`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ jobId:job._id||job.id, candidateId:1, candidateName:"Demo Candidate", candidateEmail:"demo@gmail.com", resumeFileName:candidateResume?.name }) });
+      const res = await fetch(`${API}/api/applications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobId: job._id || job.id,
+          candidateId: user.id || user._id || user.email || "demo-candidate",
+          candidateName: user.name || activeProfile?.name || "Candidate",
+          candidateEmail: user.email || activeProfile?.email || "candidate@test.com",
+          resumeUrl,
+          resumeFileName,
+        }),
+      });
+
       const data = await res.json();
-      if (!data.ok) { showToast(data.message||"Application failed","error"); return; }
+
+      if (!data.ok) {
+        showToast(data.message || "Application failed", "error");
+        return;
+      }
+
       setApplications((prev) => [{
-        id:data.application?._id || data.application?.id || Date.now(),
-        jobTitle:data.application?.jobTitle || job.title,
-        company:data.application?.company || "Confidential Hiring Partner",
-        status:data.application?.status || "Applied",
-        resumeFileName:candidateResume?.name
-      },...prev]);
-      showToast("Application submitted!","success");
-    } catch {
-      setApplications((prev) => [{
-        id:Date.now(),
-        jobTitle:job.title,
-        company:"Confidential Hiring Partner",
-        status:"Applied",
-        resumeFileName:candidateResume?.name
-      },...prev]);
-      showToast("Application submitted (offline mode)","success");
+        id: data.application?._id || data.application?.id || Date.now(),
+        jobTitle: data.application?.jobTitle || job.title,
+        company: data.application?.company || "Confidential Hiring Partner",
+        status: data.application?.status || "Applied",
+        resumeUrl,
+        resumeFileName,
+      }, ...prev]);
+
+      showToast("Application submitted!", "success");
+      setPage("candidate");
+    } catch (err) {
+      console.error(err);
+      showToast("Application failed. Please try again.", "error");
     }
   };
 
