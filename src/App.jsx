@@ -1671,31 +1671,37 @@ export default function App() {
   }, []);
 
   const applyToJob = async (job) => {
-    let user = {};
+    let currentUser = {};
 
     try {
-      user = JSON.parse(localStorage.getItem("hs_user") || "{}");
+      currentUser = JSON.parse(localStorage.getItem("hs_user") || "{}");
     } catch {
-      user = {};
+      currentUser = {};
     }
 
-    let activeProfile = candidateProfile;
+    const candidateEmail = currentUser.email || candidateProfile?.email || "";
+    const candidateName = currentUser.name || candidateProfile?.name || "Candidate User";
+    const candidateId = currentUser.id || currentUser._id || candidateProfile?.userId || candidateEmail || "demo-user";
 
-    if (!activeProfile?.resumeUrl && !activeProfile?.resumeFileName && user.email) {
+    let latestProfile = candidateProfile;
+
+    // Always verify the latest resume from backend before applying.
+    // This avoids stale React/local state after refresh, relogin, upload, or delete.
+    if (candidateEmail) {
       try {
         const profileRes = await fetch(
-          `${API}/api/candidate/profile/${encodeURIComponent(user.email)}`
+          `${API}/api/candidate/profile/${encodeURIComponent(candidateEmail)}`
         );
         const profileData = await profileRes.json();
 
         if (profileData.ok && profileData.profile) {
-          activeProfile = profileData.profile;
+          latestProfile = profileData.profile;
           setCandidateProfile(profileData.profile);
 
-          if (profileData.profile.resumeFileName) {
+          if (profileData.profile.resumeFileName || profileData.profile.resumeUrl) {
             setCandidateResume({
-              name: profileData.profile.resumeFileName,
-              url: profileData.profile.resumeUrl,
+              name: profileData.profile.resumeFileName || candidateResume?.name || "Uploaded resume",
+              url: profileData.profile.resumeUrl || candidateResume?.url || "",
               uploaded: true,
             });
           }
@@ -1705,12 +1711,14 @@ export default function App() {
       }
     }
 
-    const resumeUrl = activeProfile?.resumeUrl || candidateResume?.url || "";
+    const resumeUrl = latestProfile?.resumeUrl || candidateResume?.url || "";
     const resumeFileName =
-      activeProfile?.resumeFileName || candidateResume?.name || "";
+      latestProfile?.resumeFileName ||
+      candidateResume?.name ||
+      "";
 
-    if (!resumeUrl && !resumeFileName) {
-      showToast("Please upload your resume before applying.", "error");
+    if (!resumeUrl) {
+      showToast("Resume is required before applying", "error");
       setPage("candidate");
       return;
     }
@@ -1721,9 +1729,9 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jobId: job._id || job.id,
-          candidateId: user.id || user._id || user.email || "demo-candidate",
-          candidateName: user.name || activeProfile?.name || "Candidate",
-          candidateEmail: user.email || activeProfile?.email || "candidate@test.com",
+          candidateId,
+          candidateName,
+          candidateEmail,
           resumeUrl,
           resumeFileName,
         }),
@@ -1736,17 +1744,19 @@ export default function App() {
         return;
       }
 
-      setApplications((prev) => [{
-        id: data.application?._id || data.application?.id || Date.now(),
-        jobTitle: data.application?.jobTitle || job.title,
-        company: data.application?.company || "Confidential Hiring Partner",
-        status: data.application?.status || "Applied",
-        resumeUrl,
-        resumeFileName,
-      }, ...prev]);
+      setApplications((prev) => [
+        {
+          id: data.application?._id || data.application?.id || Date.now(),
+          jobTitle: data.application?.jobTitle || job.title,
+          company: data.application?.company || "Confidential Hiring Partner",
+          status: data.application?.status || "Applied",
+          resumeUrl,
+          resumeFileName,
+        },
+        ...prev,
+      ]);
 
       showToast("Application submitted!", "success");
-      setPage("candidate");
     } catch (err) {
       console.error(err);
       showToast("Application failed. Please try again.", "error");
