@@ -1671,50 +1671,58 @@ export default function App() {
   }, []);
 
   const applyToJob = async (job) => {
-    let currentUser = {};
+    let user = {};
 
     try {
-      currentUser = JSON.parse(localStorage.getItem("hs_user") || "{}");
+      user = JSON.parse(localStorage.getItem("hs_user") || "{}");
     } catch {
-      currentUser = {};
+      user = {};
     }
 
-    const candidateEmail = currentUser.email || candidateProfile?.email || "";
-    const candidateName = currentUser.name || candidateProfile?.name || "Candidate User";
-    const candidateId = currentUser.id || currentUser._id || candidateProfile?.userId || candidateEmail || "demo-user";
+    const candidateEmail = user.email;
+    const candidateName = user.name || "Candidate";
+    const candidateId = user.id || user._id || candidateEmail || "candidate";
+
+    if (!candidateEmail) {
+      showToast("Please login again before applying.", "error");
+      setPage("login");
+      return;
+    }
 
     let latestProfile = candidateProfile;
 
-    // Always verify the latest resume from backend before applying.
-    // This avoids stale React/local state after refresh, relogin, upload, or delete.
-    if (candidateEmail) {
-      try {
-        const profileRes = await fetch(
-          `${API}/api/candidate/profile/${encodeURIComponent(candidateEmail)}`
-        );
-        const profileData = await profileRes.json();
+    try {
+      const profileRes = await fetch(
+        `${API}/api/candidate/profile/${encodeURIComponent(candidateEmail)}`
+      );
+      const profileData = await profileRes.json();
 
-        if (profileData.ok && profileData.profile) {
-          latestProfile = profileData.profile;
-          setCandidateProfile(profileData.profile);
+      if (profileData.ok && profileData.profile) {
+        latestProfile = profileData.profile;
+        setCandidateProfile(profileData.profile);
 
-          if (profileData.profile.resumeFileName || profileData.profile.resumeUrl) {
-            setCandidateResume({
-              name: profileData.profile.resumeFileName || candidateResume?.name || "Uploaded resume",
-              url: profileData.profile.resumeUrl || candidateResume?.url || "",
-              uploaded: true,
-            });
-          }
+        if (profileData.profile.resumeFileName || profileData.profile.resumeUrl) {
+          setCandidateResume({
+            name: profileData.profile.resumeFileName || candidateResume?.name || "Uploaded resume",
+            url: profileData.profile.resumeUrl,
+            uploaded: true,
+          });
         }
-      } catch (err) {
-        console.log("Could not refresh candidate profile before applying", err);
       }
+    } catch (err) {
+      console.log("Could not refresh candidate profile before apply", err);
     }
 
-    const resumeUrl = latestProfile?.resumeUrl || candidateResume?.url || "";
+    const resumeUrl =
+      latestProfile?.resumeUrl ||
+      candidateResume?.url ||
+      candidateResume?.resumeUrl ||
+      "";
+
     const resumeFileName =
       latestProfile?.resumeFileName ||
       candidateResume?.name ||
+      candidateResume?.resumeFileName ||
       "";
 
     if (!resumeUrl) {
@@ -1757,6 +1765,7 @@ export default function App() {
       ]);
 
       showToast("Application submitted!", "success");
+      setPage("candidate");
     } catch (err) {
       console.error(err);
       showToast("Application failed. Please try again.", "error");
